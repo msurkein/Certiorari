@@ -14,6 +14,7 @@ files:
   - "package.json"
 
 asar: true
+compression: store
 
 # Where `--publish` sends artifacts. Owner/repo are auto-detected from the git
 # remote in CI. releaseType "release" publishes immediately so the build shows
