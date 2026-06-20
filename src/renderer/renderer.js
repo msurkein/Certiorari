@@ -246,11 +246,13 @@ function mountWebview(url) {
   const container = $('browser-container');
   container.innerHTML = '';
 
+  const partition = `clientcert-${++partitionSeq}`; // unique, in-memory (no 'persist:')
   const wv = document.createElement('webview');
-  wv.setAttribute('partition', `clientcert-${++partitionSeq}`); // no 'persist:' => in-memory
+  wv.setAttribute('partition', partition);
   wv.setAttribute('allowpopups', 'true');
   wv.setAttribute('src', url);
   container.appendChild(wv);
+  console.log(`[mount] webview partition=${partition} url=${url}`);
 
   wv.addEventListener('did-start-loading', () => setStatus('Loading…'));
   wv.addEventListener('did-stop-loading', () => setStatus(''));
@@ -306,8 +308,13 @@ $('addr-form').addEventListener('submit', async (e) => {
 $('cert-btn').addEventListener('click', async () => {
   const cert = await openPicker();
   if (!cert) return;
-  await applyCertAndBrowse(cert, currentUrl, false);
-  mountWebview(currentUrl); // fresh partition => new handshake with new cert
+  // Reload the page the user is ACTUALLY on (in-page navigation doesn't update
+  // currentUrl), so the new cert is applied to the current page, not the
+  // originally-entered URL.
+  const live = (currentWebview() && currentWebview().getURL()) || currentUrl;
+  currentUrl = live;
+  await applyCertAndBrowse(cert, live, false);
+  mountWebview(live); // fresh partition => new handshake with the new cert
 });
 
 // ---- cert-applied feedback from main --------------------------------------
@@ -323,6 +330,28 @@ api.onCertApplied((p) => {
     banner.textContent = p.reason || 'Certificate was not accepted by the server.';
     show(banner);
   }
+});
+
+// ---- persistent handshake diagnostic in the status bar --------------------
+api.onCertDiag((d) => {
+  const el = $('cert-diag');
+  if (!el) return;
+  let cls = 'cert-diag';
+  let text;
+  if (d.defaultSession) {
+    cls += ' bad';
+    text = `⚠ SHARED session (wc#${d.wcId}) — cert is pinned, won't change`;
+  } else if (d.want && d.matched) {
+    cls += ' ok';
+    text = `🔐 ${d.host} · ${d.offered} offered · wc#${d.wcId} · isolated → "${d.want}"`;
+  } else if (d.want && !d.matched) {
+    cls += ' warn';
+    text = `✗ "${d.want}" not among ${d.offered} offered · ${d.host} · wc#${d.wcId}`;
+  } else {
+    text = `${d.host} · ${d.offered} offered · wc#${d.wcId} · no app cert (native picker)`;
+  }
+  el.className = cls;
+  el.textContent = `${d.at}  ${text}`;
 });
 
 // ===========================================================================
