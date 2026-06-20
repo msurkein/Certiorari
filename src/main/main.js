@@ -21,7 +21,11 @@ let logWindow = null;
 
 function hostFromUrl(url) {
   try {
-    return new URL(url).host;
+    let u = url;
+    if (u && !/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) {
+      u = 'https://' + u;
+    }
+    return new URL(u).host;
   } catch {
     return '';
   }
