@@ -101,6 +101,36 @@ function notifyRenderer(channel, payload) {
 }
 
 // ---------------------------------------------------------------------------
+//  NUCLEAR HTTPS/TLS RESET
+//  Tears down every clearable network-state layer for a session. Note: the
+//  client-certificate selection cache (SSLClientAuthCache) has NO public clear
+//  API — the only real reset for it is a brand-new in-memory partition (a fresh
+//  NetworkContext), which the renderer mints on every cert change. The clears
+//  here kill everything else (live sockets, HTTP/auth/DNS/code caches, cookies
+//  and all storage) so nothing from the old identity can be reused.
+// ---------------------------------------------------------------------------
+async function nukeSession(ses, name) {
+  const steps = [];
+  const step = async (label, fn) => {
+    try {
+      await fn();
+      steps.push(label);
+    } catch {
+      steps.push(label + '✗');
+    }
+  };
+  // Close sockets first so no in-flight connection survives the clears.
+  await step('connections', () => ses.closeAllConnections());
+  await step('authCache', () => ses.clearAuthCache());
+  await step('hostResolver', () => ses.clearHostResolverCache());
+  await step('cache', () => ses.clearCache());
+  await step('codeCaches', () => ses.clearCodeCaches({}));
+  await step('storage', () => ses.clearStorageData());
+  if (typeof ses.clearData === 'function') await step('data', () => ses.clearData());
+  return { name, steps };
+}
+
+// ---------------------------------------------------------------------------
 //  IPC surface (called from the renderer via the preload bridge)
 // ---------------------------------------------------------------------------
 
@@ -133,6 +163,17 @@ ipcMain.handle('secret:set', (_evt, { thumbprint, password }) =>
   secrets.setPassword(thumbprint, password)
 );
 ipcMain.handle('secret:forget', (_evt, thumbprint) => secrets.forgetPassword(thumbprint));
+
+// Nuke all network/TLS state for the default session AND the given (old)
+// partition, on every cert change. Returns what got cleared (shown on-screen).
+ipcMain.handle('session:nuke', async (_evt, partitionName) => {
+  const results = [await nukeSession(session.defaultSession, 'default')];
+  if (partitionName) {
+    results.push(await nukeSession(session.fromPartition(partitionName), partitionName));
+  }
+  console.log('[nuke]', JSON.stringify(results));
+  return results;
+});
 
 // --- label-template mappings ------------------------------------------------
 ipcMain.handle('mappings:canonicalize', (_evt, url) => mappings.canonicalizeUrl(url));

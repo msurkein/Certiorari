@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('certiorari', {
   // certificates (labels are resolved for the given url's mapping templates)
   listCerts: (url) => ipcRenderer.invoke('certs:list', { url }),
   setCertForUrl: (url, identity) => ipcRenderer.invoke('session:setCert', { url, identity }),
+  nukeSession: (partition) => ipcRenderer.invoke('session:nuke', partition),
 
   // label-template mappings
   mappings: {
