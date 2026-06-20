@@ -45,4 +45,9 @@ contextBridge.exposeInMainWorld('certiorari', {
     ipcRenderer.on('cert:applied', handler);
     return () => ipcRenderer.removeListener('cert:applied', handler);
   },
+  onCertDiag: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('cert:diag', handler);
+    return () => ipcRenderer.removeListener('cert:diag', handler);
+  },
 });

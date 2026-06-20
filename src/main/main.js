@@ -52,28 +52,46 @@ app.on('select-client-certificate', (event, webContents, url, list, callback) =>
   const host = hostFromUrl(url);
   const want = certForHost.get(host);
 
-  if (!want) {
-    // No choice recorded for this host — let Chromium fall back to its own
-    // native picker rather than guessing.
-    return;
-  }
+  // If `defaultSession` is ever true, the <webview> partition isn't isolating
+  // sessions, so the first cert chosen for a host stays cached and the event
+  // won't re-fire — which looks exactly like "the cert won't change". Each cert
+  // change should show a NEW wcId (a freshly mounted webview).
+  const onDefaultSession = webContents.session === session.defaultSession;
 
-  const match = certs.findCertInList(list, want);
-  if (match) {
-    event.preventDefault();
-    callback(match);
-    notifyRenderer('cert:applied', { host, label: want.label, ok: true });
-  } else {
-    // The cert the user picked was NOT among the certs the server is willing to
-    // accept (its CertificateRequest named different CAs). Surface it and let
-    // the native picker appear so the user isn't stuck.
-    notifyRenderer('cert:applied', {
-      host,
-      label: want.label,
-      ok: false,
-      reason: 'The selected certificate was not offered/accepted by this server.',
-    });
+  let matched = false;
+  if (want) {
+    const match = certs.findCertInList(list, want);
+    if (match) {
+      event.preventDefault();
+      callback(match);
+      matched = true;
+      notifyRenderer('cert:applied', { host, label: want.label, ok: true });
+    } else {
+      // The chosen cert was NOT among those the server is willing to accept
+      // (its CertificateRequest named different CAs). Let the native picker show.
+      notifyRenderer('cert:applied', {
+        host,
+        label: want.label,
+        ok: false,
+        reason: 'The selected certificate was not offered/accepted by this server.',
+      });
+    }
   }
+  // (No recorded choice, or no match → no preventDefault → Chromium's native picker.)
+
+  // Surface what happened on-screen (status bar) AND to the console, so it's
+  // visible whether launched via `npm start` or the packaged exe.
+  const diag = {
+    host,
+    wcId: webContents.id,
+    defaultSession: onDefaultSession,
+    offered: list.length,
+    want: want ? want.label : null,
+    matched,
+    at: new Date().toLocaleTimeString(),
+  };
+  console.log('[client-cert]', JSON.stringify(diag));
+  notifyRenderer('cert:diag', diag);
 });
 
 function notifyRenderer(channel, payload) {
