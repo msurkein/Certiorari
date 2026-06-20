@@ -7,6 +7,7 @@ let certsCache = [];
 let currentUrl = '';
 let currentCert = null; // { thumbprint, serialNumber, label }
 let partitionSeq = 0; // bumps each time we need a fresh TLS session
+let currentPartition = null; // partition of the live webview (nuked on cert change)
 let pickerResolve = null; // set while the picker modal is open
 let unlockTarget = null; // cert being edited in the unlock modal
 
@@ -247,6 +248,7 @@ function mountWebview(url) {
   container.innerHTML = '';
 
   const partition = `clientcert-${++partitionSeq}`; // unique, in-memory (no 'persist:')
+  currentPartition = partition;
   const wv = document.createElement('webview');
   wv.setAttribute('partition', partition);
   wv.setAttribute('allowpopups', 'true');
@@ -313,8 +315,19 @@ $('cert-btn').addEventListener('click', async () => {
   // originally-entered URL.
   const live = (currentWebview() && currentWebview().getURL()) || currentUrl;
   currentUrl = live;
+  const oldPartition = currentPartition;
+
   await applyCertAndBrowse(cert, live, false);
+
+  // NUCLEAR: tear down the old partition's + default session's sockets, caches,
+  // cookies and storage, then mount on a brand-new partition. The new partition
+  // is a fresh NetworkContext, which is the only real reset for the client-cert
+  // selection cache.
+  setStatus('Resetting HTTPS state…');
+  const cleared = await api.nukeSession(oldPartition);
+  console.log('[nuke]', cleared);
   mountWebview(live); // fresh partition => new handshake with the new cert
+  setStatus('HTTPS state reset — new isolated session');
 });
 
 // ---- cert-applied feedback from main --------------------------------------
