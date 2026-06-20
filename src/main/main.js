@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu } = require('electron');
 
 const certs = require('./certs');
 const config = require('./config');
@@ -17,6 +17,7 @@ const labels = require('./labels');
 const certForHost = new Map();
 
 let mainWindow = null;
+let logWindow = null;
 
 function hostFromUrl(url) {
   try {
@@ -83,14 +84,21 @@ app.on('select-client-certificate', (event, webContents, url, list, callback) =>
   // visible whether launched via `npm start` or the packaged exe.
   const diag = {
     host,
+    url,
     wcId: webContents.id,
     defaultSession: onDefaultSession,
+    partition: webContents.session.getStoragePath() || 'in-memory',
     offered: list.length,
+    offeredDetails: list.map(c => ({
+      subject: c.subjectName,
+      tp: certs.sha1ThumbprintFromPem(c.data),
+      sn: certs.normalizeSerial(c.serialNumber)
+    })),
     want: want ? want.label : null,
     matched,
     at: new Date().toLocaleTimeString(),
   };
-  console.log('[client-cert]', JSON.stringify(diag));
+  logToWindow('diag', '[client-cert] EVENT FIRING', diag);
   notifyRenderer('cert:diag', diag);
 });
 
@@ -98,6 +106,14 @@ function notifyRenderer(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
   }
+  if (logWindow && !logWindow.isDestroyed()) {
+    logWindow.webContents.send(channel, payload);
+  }
+}
+
+function logToWindow(type, message, data = null) {
+  console.log(`[${type}] ${message}`, data ? JSON.stringify(data) : '');
+  notifyRenderer('app:log', { type, message, data });
 }
 
 // ---------------------------------------------------------------------------
@@ -113,9 +129,12 @@ async function nukeSession(ses, name) {
   const steps = [];
   const step = async (label, fn) => {
     try {
+      logToWindow('nuke', `starting ${name}:${label}`);
       await fn();
       steps.push(label);
-    } catch {
+      logToWindow('nuke', `finished ${name}:${label}`);
+    } catch (e) {
+      logToWindow('nuke', `failed ${name}:${label} - ${e.message}`);
       steps.push(label + '✗');
     }
   };
@@ -171,7 +190,7 @@ ipcMain.handle('session:nuke', async (_evt, partitionName) => {
   if (partitionName) {
     results.push(await nukeSession(session.fromPartition(partitionName), partitionName));
   }
-  console.log('[nuke]', JSON.stringify(results));
+  logToWindow('nuke', 'Nuclear reset complete', results);
   return results;
 });
 
@@ -217,7 +236,83 @@ ipcMain.handle('mappings:openEditor', (_evt, url) => {
   });
 });
 
+function openLogWindow() {
+  if (logWindow && !logWindow.isDestroyed()) {
+    logWindow.focus();
+    return;
+  }
+  logWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    backgroundColor: '#0d0e12',
+    title: 'Diagnostic Logs',
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  logWindow.setMenuBarVisibility(false);
+  logWindow.loadFile(path.join(__dirname, '..', 'renderer', 'logs.html'));
+  logWindow.on('closed', () => {
+    logWindow = null;
+  });
+}
+
+function setupMenu() {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Diagnostic',
+      submenu: [
+        {
+          label: 'Show Logs',
+          click: () => openLogWindow()
+        }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { role: 'close' }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 app.whenReady().then(() => {
+  logToWindow('info', 'App starting...');
+  logToWindow('info', `  userData: ${app.getPath('userData')}`);
+  logToWindow('info', `  cache:    ${app.getPath('cache')}`);
+  logToWindow('info', `  temp:     ${app.getPath('temp')}`);
+  logToWindow('info', `  name:     ${app.name}`);
+
+  setupMenu();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
