@@ -137,9 +137,10 @@ scripts/list-certs.js    standalone store dump (npm run certs)
 
 Built with electron-builder (config in [`electron-builder.yml`](electron-builder.yml)).
 
-- `npm run dist` — builds a **portable** single `.exe` **and** an **NSIS installer** into `dist/`.
-- `npm run dist:portable` — portable `.exe` only (no install; ideal for short-lived use).
-- `npm run pack` — unpacked folder in `dist/win-unpacked/` (for inspecting the bundle).
+- `npm run dist` — builds a **portable** single `.exe` **and** an **NSIS installer** into `dist/`. Auto-increments version.
+- `npm run dist:portable` — portable `.exe` only. Auto-increments version.
+- `npm run pack` — unpacked folder in `dist/win-unpacked/` (for inspection). No version bump.
+- `npm run version:patch` — manually increment the version patch in `package.json`.
 
 Outputs:
 - `dist/Certiorari-<version>-portable.exe` — run directly, nothing installed.
