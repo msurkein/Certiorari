@@ -111,6 +111,59 @@ function rulesFor(canonicalOrigin) {
   return [...specific, ...global];
 }
 
+/**
+ * Import mappings from a JSON string.
+ * @param {string} str - JSON string containing mappings.
+ * @param {boolean} replace - If true, replace all existing mappings. If false, append/merge.
+ */
+function importFromString(str, replace) {
+  try {
+    const parsed = JSON.parse(str);
+    if (!parsed || typeof parsed !== 'object' || !parsed.mappings) {
+      throw new Error('Invalid mappings format');
+    }
+
+    const store = getStore();
+    if (replace) {
+      store.mappings = {};
+    }
+
+    for (const [key, rules] of Object.entries(parsed.mappings)) {
+      const clean = cloneRules(rules).filter((r) => r.issuer.trim() || r.template.trim());
+      if (clean.length) {
+        if (replace || !store.mappings[key]) {
+          store.mappings[key] = clean;
+        } else {
+          // Merge rules, avoiding duplicates by stringifying
+          const existing = store.mappings[key];
+          const existingKeys = new Set(existing.map(r => `${r.issuer}|${r.template}`));
+          for (const r of clean) {
+            const k = `${r.issuer}|${r.template}`;
+            if (!existingKeys.has(k)) {
+              existing.push(r);
+              existingKeys.add(k);
+            }
+          }
+        }
+      }
+    }
+
+    writeStore(store);
+    return true;
+  } catch (err) {
+    console.error('Import failed:', err);
+    throw err;
+  }
+}
+
+/**
+ * Export all mappings to a JSON string.
+ */
+function exportToString() {
+  const store = getStore();
+  return JSON.stringify(store, null, 2);
+}
+
 module.exports = {
   GLOBAL_KEY,
   canonicalizeUrl,
@@ -118,4 +171,6 @@ module.exports = {
   getBucket,
   setBucket,
   rulesFor,
+  importFromString,
+  exportToString,
 };

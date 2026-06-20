@@ -272,6 +272,48 @@ function wireEvents() {
   }, 250);
   $('test-subject').addEventListener('input', onTestEdit);
   $('test-issuer').addEventListener('input', onTestEdit);
+  
+  // export/import
+  $('export-btn').addEventListener('click', async () => {
+    const str = await api.mappings.export();
+    await navigator.clipboard.writeText(str);
+    const oldText = $('export-btn').textContent;
+    $('export-btn').textContent = 'Copied!';
+    setTimeout(() => { $('export-btn').textContent = oldText; }, 2000);
+  });
+
+  const modal = $('import-modal');
+  $('import-btn').addEventListener('click', () => {
+    $('import-text').value = '';
+    modal.classList.remove('hidden');
+    $('import-text').focus();
+  });
+  
+  const closeImport = () => modal.classList.add('hidden');
+  $('import-close').addEventListener('click', closeImport);
+  $('import-cancel').addEventListener('click', closeImport);
+
+  $('import-confirm').addEventListener('click', async () => {
+    const str = $('import-text').value.trim();
+    if (!str) return;
+    const replace = $('import-replace').checked;
+    
+    try {
+      const ok = await api.mappings.import(str, replace);
+      if (ok) {
+        closeImport();
+        // Reload everything
+        buckets = await api.mappings.getAll();
+        populateBuckets();
+        loadBucket(selectedKey);
+        const d = $('dirty');
+        d.textContent = 'Imported ✓';
+        setTimeout(() => { if (!dirty) d.textContent = ''; }, 2000);
+      }
+    } catch (err) {
+      alert(`Import failed: ${err.message}`);
+    }
+  });
 }
 
 async function save() {

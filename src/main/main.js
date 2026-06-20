@@ -209,6 +209,14 @@ ipcMain.handle('mappings:setBucket', (_evt, { key, rules }) => {
   return saved;
 });
 ipcMain.handle('mappings:globalKey', () => mappings.GLOBAL_KEY);
+ipcMain.handle('mappings:export', () => mappings.exportToString());
+ipcMain.handle('mappings:import', (_evt, { str, replace }) => {
+  const ok = mappings.importFromString(str, replace);
+  if (ok && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('mappings:changed');
+  }
+  return ok;
+});
 ipcMain.handle('mappings:preview', (_evt, payload) => labels.preview(payload));
 
 // Open the mappings editor in its own window, scoped to the given url's origin.

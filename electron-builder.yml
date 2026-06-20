@@ -6,15 +6,15 @@ directories:
   output: dist          # built installers/exe land here
   buildResources: build # icon.ico, etc. are auto-discovered here
 
-# Only ship what the app needs at runtime. We have zero production deps, so this
-# stays tiny — just the source + manifest. (Electron itself is added by the
-# builder; scripts/ and docs are dev-only.)
+# Only ship what the app needs at runtime.
 files:
   - "src/**/*"
   - "package.json"
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,README,test,tests,example,examples,coverage,.github,test.js}"
+  - "!**/node_modules/.bin"
 
 asar: true
-compression: store
+compression: maximum
 
 # Where `--publish` sends artifacts. Owner/repo are auto-detected from the git
 # remote in CI. releaseType "release" publishes immediately so the build shows
