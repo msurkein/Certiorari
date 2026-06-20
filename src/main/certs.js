@@ -31,7 +31,7 @@ function listCertificates() {
 $ErrorActionPreference = 'Stop'
 $paths = @(${STORE_PATHS.map((p) => `'${p}'`).join(',')})
 $all = foreach ($p in $paths) {
-  Get-ChildItem $p | Where-Object { $_.HasPrivateKey } | ForEach-Object {
+  Get-ChildItem $p | Where-Object { $_.HasPrivateKey -and $_.Subject -ne $_.Issuer } | ForEach-Object {
     $eku = @()
     try { $eku = @($_.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId }) } catch {}
     [PSCustomObject]@{
