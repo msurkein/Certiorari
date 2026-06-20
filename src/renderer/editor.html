@@ -19,6 +19,10 @@
           otherwise the built-in <code>CN - OU1 - OU2 …</code> format is used.
         </p>
       </div>
+      <div class="head-actions">
+        <button id="export-btn" class="ghost" title="Copy all mappings to clipboard">Export</button>
+        <button id="import-btn" class="ghost" title="Import mappings from clipboard">Import</button>
+      </div>
     </header>
 
     <section class="ed-scope">
@@ -71,5 +75,25 @@
     </details>
 
     <script src="editor.js"></script>
+
+    <!-- ===================== IMPORT MODAL ===================== -->
+    <div id="import-modal" class="modal-overlay hidden">
+      <div class="modal small">
+        <div class="modal-head">
+          <h2>Import mappings</h2>
+          <button class="icon-btn" id="import-close">✕</button>
+        </div>
+        <p>Paste the mapping string below:</p>
+        <textarea id="import-text" placeholder='{ "version": 1, "mappings": { ... } }' spellcheck="false"></textarea>
+        <label class="remember">
+          <input id="import-replace" type="checkbox" />
+          Replace all existing mappings
+        </label>
+        <div class="modal-actions">
+          <button id="import-cancel" class="ghost">Cancel</button>
+          <button id="import-confirm" class="btn-primary">Import</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

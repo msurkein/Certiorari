@@ -11,6 +11,15 @@
 
 .ed-head h1 { margin: 0 0 4px; font-size: 21px; }
 .ed-head p { margin: 0; font-size: 13px; }
+.ed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.head-actions {
+  display: flex;
+  gap: 8px;
+}
 .ed-head code,
 .ed-ref code {
   background: var(--surface-2);
@@ -113,3 +122,17 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: var(--rin
 .ed-ref-body ul { margin: 4px 0 12px; padding-left: 18px; }
 .ed-ref-body li { margin: 3px 0; }
 .ed-ref-body strong { color: var(--text); font-weight: 500; }
+
+#import-text {
+  width: 100%;
+  height: 120px;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 11px;
+  margin: 10px 0;
+  resize: none;
+}
