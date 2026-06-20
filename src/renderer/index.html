@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <title>Certiorari</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ===================== VIEW 1: URL ENTRY ===================== -->
+    <section id="view-start" class="view active">
+      <div class="start-card">
+        <div class="brand">
+          <div class="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2.5l7.5 3.2v5.6c0 4.7-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.7-7.5-9.4V5.7L12 2.5z"
+                fill="currentColor" fill-opacity=".18" />
+              <path d="M12 2.5l7.5 3.2v5.6c0 4.7-3.2 8.3-7.5 9.4-4.3-1.1-7.5-4.7-7.5-9.4V5.7L12 2.5z"
+                stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+              <path d="M8.4 12.1l2.6 2.6 4.6-5.2" stroke="currentColor" stroke-width="1.7"
+                stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>Certiorari</h1>
+            <p class="tagline">Client-certificate browser</p>
+          </div>
+        </div>
+        <p class="muted intro">Open a site using a specific certificate from your Personal store.</p>
+        <form id="url-form">
+          <input
+            id="url-input"
+            type="text"
+            placeholder="https://example.com"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="submit" id="go-btn" class="btn-primary">Continue →</button>
+        </form>
+        <p id="start-error" class="error"></p>
+      </div>
+    </section>
+
+    <!-- ===================== VIEW 2: BROWSER ===================== -->
+    <section id="view-browser" class="view">
+      <header class="toolbar">
+        <button id="home-btn" title="Back to start">⌂</button>
+        <button id="back-btn" title="Back">←</button>
+        <button id="reload-btn" title="Reload">⟳</button>
+        <form id="addr-form" class="addr">
+          <div class="addr-pill">
+            <span class="addr-ico" aria-hidden="true">🔒</span>
+            <input id="addr-input" type="text" autocomplete="off" spellcheck="false" />
+          </div>
+        </form>
+        <button id="cert-btn" class="cert-btn" title="Change certificate">
+          <span class="lock">🔐</span><span id="cert-btn-label">Select certificate…</span>
+        </button>
+      </header>
+      <div id="cert-banner" class="banner hidden"></div>
+      <div id="browser-container"></div>
+      <footer id="status" class="status"></footer>
+    </section>
+
+    <!-- ===================== CERT PICKER MODAL ===================== -->
+    <div id="picker-modal" class="modal-overlay hidden">
+      <div class="modal">
+        <div class="modal-head">
+          <h2>Select a certificate</h2>
+          <div class="modal-head-actions">
+            <button class="head-btn" id="picker-edit-mappings" title="Edit how certificate labels are built">
+              ⚙ Label mappings
+            </button>
+            <button class="icon-btn" id="picker-close">✕</button>
+          </div>
+        </div>
+        <div class="search-box">
+          <span class="search-ico" aria-hidden="true">🔎</span>
+          <input
+            id="picker-search"
+            type="text"
+            placeholder="Search by subject…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="picker-clear" class="search-clear hidden" type="button" aria-label="Clear search">
+            ✕
+          </button>
+        </div>
+        <div id="picker-count" class="picker-count"></div>
+        <div id="picker-list" class="picker-list"></div>
+        <p id="picker-empty" class="muted hidden">
+          No certificates with a private key were found in your Personal store.
+        </p>
+        <p id="picker-nomatch" class="muted hidden">No certificates match your search.</p>
+      </div>
+    </div>
+
+    <!-- ===================== UNLOCK / SAVE PASSWORD MODAL ===================== -->
+    <!--
+      Used for the ".pfx / app-managed password" path. For certs already in the
+      Windows store, Windows shows its own native unlock prompt during the
+      handshake and this modal is not needed. See README "Advanced".
+    -->
+    <div id="unlock-modal" class="modal-overlay hidden">
+      <div class="modal small">
+        <div class="modal-head">
+          <h2>Certificate password</h2>
+          <button class="icon-btn" id="unlock-close">✕</button>
+        </div>
+        <p class="muted" id="unlock-cert-label"></p>
+        <input id="unlock-pw" type="password" placeholder="Password / PIN" autocomplete="off" />
+        <label class="remember">
+          <input id="unlock-remember" type="checkbox" />
+          Remember (encrypted for this Windows user via DPAPI)
+        </label>
+        <p id="unlock-saved-note" class="muted hidden"></p>
+        <div class="modal-actions">
+          <button id="unlock-forget" class="ghost hidden">Forget saved</button>
+          <button id="unlock-save" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

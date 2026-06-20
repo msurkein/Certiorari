@@ -1,0 +1,50 @@
+appId: com.surkein.certiorari
+productName: Certiorari
+copyright: Copyright © 2026 Surkein
+
+directories:
+  output: dist          # built installers/exe land here
+  buildResources: build # icon.ico, etc. are auto-discovered here
+
+# Only ship what the app needs at runtime. We have zero production deps, so this
+# stays tiny — just the source + manifest. (Electron itself is added by the
+# builder; scripts/ and docs are dev-only.)
+files:
+  - "src/**/*"
+  - "package.json"
+
+asar: true
+
+# Where `--publish` sends artifacts. Owner/repo are auto-detected from the git
+# remote in CI. releaseType "release" publishes immediately so the build shows
+# up on the Releases page (the default would leave it as an unlisted draft).
+publish:
+  provider: github
+  releaseType: release
+
+win:
+  # If build/icon.ico exists it is used automatically; otherwise the default
+  # Electron icon is used (the build still succeeds). See build/README.md.
+  target:
+    - target: portable
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+  # ---- CODE SIGNING (see README "Packaging") -----------------------------
+  # Leave unset to ship UNSIGNED (SmartScreen will warn). To sign, do NOT put
+  # secrets here — pass them as environment variables at build time:
+  #   CSC_LINK           = path to your .pfx  (or base64 of it)
+  #   CSC_KEY_PASSWORD   = the .pfx password
+  # electron-builder picks those up automatically. For EV / cloud-HSM certs,
+  # configure win.signtoolOptions or a custom sign hook instead.
+
+portable:
+  artifactName: ${productName}-${version}-portable.exe
+
+nsis:
+  oneClick: true          # simple, no wizard
+  perMachine: false       # per-user install → no admin / UAC prompt
+  allowElevation: false
+  artifactName: ${productName}-${version}-setup.exe
+  shortcutName: Certiorari
+  deleteAppDataOnUninstall: false   # keep saved passwords/config on uninstall

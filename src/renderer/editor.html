@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <title>Label mappings</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body class="editor-body">
+    <header class="ed-head">
+      <div>
+        <h1>Label mappings</h1>
+        <p class="muted">
+          Templates decide the certificate label, matched by issuer. First matching rule wins;
+          otherwise the built-in <code>CN - OU1 - OU2 …</code> format is used.
+        </p>
+      </div>
+    </header>
+
+    <section class="ed-scope">
+      <label for="bucket-select">Scope</label>
+      <select id="bucket-select"></select>
+      <input id="new-site" type="text" class="hidden" placeholder="https://site.example.com" spellcheck="false" />
+      <button id="new-site-add" class="hidden">Add</button>
+      <span class="grow"></span>
+      <span id="dirty" class="muted"></span>
+      <button id="save-btn" class="btn-primary">Save</button>
+    </section>
+
+    <section class="ed-rules">
+      <div id="rules-list"></div>
+      <button id="add-rule" class="ghost">＋ Add rule</button>
+    </section>
+
+    <section class="ed-test">
+      <h2>Preview against</h2>
+      <div class="ed-test-row">
+        <select id="test-cert"></select>
+      </div>
+      <div class="ed-test-grid">
+        <label>Subject<input id="test-subject" type="text" spellcheck="false" /></label>
+        <label>Issuer<input id="test-issuer" type="text" spellcheck="false" /></label>
+      </div>
+    </section>
+
+    <details class="ed-ref">
+      <summary>Template reference (Liquid)</summary>
+      <div class="ed-ref-body">
+        <p><strong>Variables</strong> (from the Subject):</p>
+        <ul>
+          <li><code>cn</code> — first CN · <code>ou</code> — array, 0-indexed: <code>ou[0]</code>, <code>ou[1]</code>, …</li>
+          <li><code>o</code>, <code>c</code>, <code>l</code>, <code>st</code>, <code>email</code> — first value of each</li>
+          <li><code>issuer.cn</code>, <code>issuer.o</code>, <code>dn</code> (full subject string)</li>
+        </ul>
+        <p><strong>Filters</strong>:</p>
+        <ul>
+          <li><code>upcase</code>, <code>downcase</code>, <code>capitalize</code>, <code>strip</code></li>
+          <li><code>slice: a, b</code> (substring) · <code>append: 'x'</code> · <code>prepend: 'x'</code> · <code>default: 'x'</code></li>
+          <li><code>skip: n</code> (drop first n chars) · <code>take: n</code> (keep first n chars)</li>
+        </ul>
+        <p><strong>Examples</strong>:</p>
+        <ul>
+          <li><code>{{ ou[1] | upcase }} - {{ ou[3] | upcase }} - {{ ou[4] | upcase }}</code></li>
+          <li><code>{{ ou[0] }} - {{ ou[4] | skip: 5 }} - {{ ou[1] }}</code></li>
+        </ul>
+      </div>
+    </details>
+
+    <script src="editor.js"></script>
+  </body>
+</html>

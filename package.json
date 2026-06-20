@@ -1,0 +1,23 @@
+{
+  "name": "certiorari",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pick a specific Windows client certificate and browse a site with it (mTLS).",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "certs": "node scripts/list-certs.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "author": "Surkein <claude@surkein.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "liquidjs": "^10.27.0"
+  }
+}

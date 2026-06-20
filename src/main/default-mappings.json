@@ -1,0 +1,9 @@
+{
+  "_comment": "Packaged label-template defaults. Seeded into the user's store (under the global '*' bucket) on first run, after which they're fully editable in the mappings window. Templates use Liquid; see labels.js for the available context (cn, ou[], o, issuer.*) and the custom 'skip'/'take' filters.",
+  "global": [
+    {
+      "issuer": "CN=Bob Enterprises",
+      "template": "{{ ou[0] }} - {{ ou[4] | skip: 5 }} - {{ ou[1] }}"
+    }
+  ]
+}
