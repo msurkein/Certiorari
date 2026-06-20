@@ -16,7 +16,9 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^42.4.1",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
     "liquidjs": "^10.27.0"
   }
 }
