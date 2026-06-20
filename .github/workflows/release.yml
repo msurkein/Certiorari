@@ -1,0 +1,42 @@
+name: Build & Release
+
+# Build the Windows installers and publish them to the repo's "Releases" page
+# whenever changes land on master (e.g. a merged PR). Releases are tagged with
+# the version from package.json (v<version>), so bump that version to cut a new
+# release — pushes that reuse the same version refresh the existing release's
+# assets instead of creating a new one.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+# Required for electron-builder to create/update GitHub Releases.
+permissions:
+  contents: write
+
+# If several merges land in quick succession, only finish the latest build.
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & publish to GitHub Releases
+        run: npm run dist -- --publish always
+        env:
+          # Auto-provided by Actions; electron-builder uses it to publish.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
