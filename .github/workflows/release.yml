@@ -1,23 +1,31 @@
 name: Build & Release
 
-# Build the Windows installers and publish them to the repo's "Releases" page
-# whenever changes land on master (e.g. a merged PR). Releases are tagged with
-# the version from package.json (v<version>), so bump that version to cut a new
-# release — pushes that reuse the same version refresh the existing release's
-# assets instead of creating a new one.
+# On every push to master: auto-increment the version, commit it back to master
+# (so package.json is the canonical, build-system-owned version), then build the
+# Windows installers and publish them to the repo's Releases page as v<version>.
+#
+# Loop safety (two layers): the bump commit message carries "[skip ci]", AND
+# pushes made with the built-in GITHUB_TOKEN don't trigger workflow runs — so the
+# auto-commit can never re-trigger this job.
 on:
   push:
     branches: [master]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump level"
+        type: choice
+        default: patch
+        options: [patch, minor, major]
 
-# Required for electron-builder to create/update GitHub Releases.
+# Required to push the version-bump commit and to create/update GitHub Releases.
 permissions:
   contents: write
 
-# If several merges land in quick succession, only finish the latest build.
+# Serialize releases; do NOT cancel a run mid-bump/publish.
 concurrency:
   group: release
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -25,6 +33,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0 # full history + tags so version/tagging is clean
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -34,6 +45,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Auto-increment version & commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version ${{ inputs.bump || 'patch' }} -m "ci: release v%s [skip ci]"
+          git push --follow-tags origin master
 
       - name: Build & publish to GitHub Releases
         run: npm run dist -- --publish always

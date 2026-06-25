@@ -1,7 +1,8 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const fs = require('node:fs');
+const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 
 const certs = require('./certs');
 const config = require('./config');
@@ -187,6 +188,34 @@ ipcMain.handle('mappings:setBucket', (_evt, { key, rules }) => {
 });
 ipcMain.handle('mappings:globalKey', () => mappings.GLOBAL_KEY);
 ipcMain.handle('mappings:preview', (_evt, payload) => labels.preview(payload));
+
+ipcMain.handle('mappings:export', async () => {
+  const res = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow(), {
+    title: 'Export label mappings',
+    defaultPath: 'certiorari-mappings.json',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (res.canceled || !res.filePath) return { canceled: true };
+  fs.writeFileSync(res.filePath, JSON.stringify(mappings.exportStore(), null, 2), 'utf8');
+  return { ok: true, path: res.filePath };
+});
+
+ipcMain.handle('mappings:import', async () => {
+  const res = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
+    title: 'Import label mappings',
+    properties: ['openFile'],
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (res.canceled || !res.filePaths || !res.filePaths.length) return { canceled: true };
+  try {
+    const obj = JSON.parse(fs.readFileSync(res.filePaths[0], 'utf8'));
+    const result = mappings.importStore(obj);
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('mappings:changed');
+    return { ok: true, ...result };
+  } catch (e) {
+    return { error: String((e && e.message) || e) };
+  }
+});
 
 // Open the mappings editor in its own window, scoped to the given url's origin.
 let editorWindow = null;

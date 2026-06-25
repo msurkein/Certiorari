@@ -101,6 +101,10 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: var(--rin
 .ed-test-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
 .ed-test-grid input { font-family: var(--font-mono, ui-monospace, Consolas, monospace); font-size: 12.5px; }
 
+/* export / import */
+.ed-io { display: flex; align-items: center; gap: 10px; }
+#io-status { font-size: 12px; }
+
 /* reference */
 .ed-ref {
   background: var(--surface);

@@ -272,6 +272,31 @@ function wireEvents() {
   }, 250);
   $('test-subject').addEventListener('input', onTestEdit);
   $('test-issuer').addEventListener('input', onTestEdit);
+
+  $('export-btn').addEventListener('click', async () => {
+    const r = await api.mappings.export();
+    if (r.canceled) return;
+    setIoStatus(r.ok ? `Exported to ${r.path}` : 'Export failed');
+  });
+
+  $('import-btn').addEventListener('click', async () => {
+    const r = await api.mappings.import();
+    if (r.canceled) return;
+    if (r.error) {
+      setIoStatus(`Import failed: ${r.error}`);
+      return;
+    }
+    // Reload from the now-updated store, keeping the current scope if it survives.
+    buckets = await api.mappings.getAll();
+    if (!buckets[selectedKey] && selectedKey !== GLOBAL) selectedKey = GLOBAL;
+    populateBuckets();
+    loadBucket(selectedKey);
+    setIoStatus(`Imported ${r.buckets} scope${r.buckets === 1 ? '' : 's'}`);
+  });
+}
+
+function setIoStatus(text) {
+  $('io-status').textContent = text;
 }
 
 async function save() {

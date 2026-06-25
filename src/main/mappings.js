@@ -111,6 +111,29 @@ function rulesFor(canonicalOrigin) {
   return [...specific, ...global];
 }
 
+/** Serializable snapshot of the whole store, for export to a file. */
+function exportStore() {
+  return { version: 1, mappings: JSON.parse(JSON.stringify(getAll())) };
+}
+
+/**
+ * Merge an imported store into the current one: each bucket present in the
+ * import overwrites that scope; scopes not in the import are left untouched.
+ * Returns the number of scopes imported. Throws on a malformed file.
+ */
+function importStore(obj) {
+  if (!obj || typeof obj !== 'object' || !obj.mappings || typeof obj.mappings !== 'object') {
+    throw new Error('Invalid mappings file: missing a "mappings" object.');
+  }
+  let buckets = 0;
+  for (const [key, rules] of Object.entries(obj.mappings)) {
+    if (!Array.isArray(rules)) continue;
+    setBucket(key, rules); // setBucket clones + drops empty rules
+    buckets++;
+  }
+  return { buckets };
+}
+
 module.exports = {
   GLOBAL_KEY,
   canonicalizeUrl,
@@ -118,4 +141,6 @@ module.exports = {
   getBucket,
   setBucket,
   rulesFor,
+  exportStore,
+  importStore,
 };

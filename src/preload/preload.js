@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('certiorari', {
     globalKey: () => ipcRenderer.invoke('mappings:globalKey'),
     preview: (payload) => ipcRenderer.invoke('mappings:preview', payload),
     openEditor: (url) => ipcRenderer.invoke('mappings:openEditor', url),
+    export: () => ipcRenderer.invoke('mappings:export'),
+    import: () => ipcRenderer.invoke('mappings:import'),
   },
   onMappingsChanged: (cb) => {
     const handler = () => cb();
