@@ -11,6 +11,24 @@ const mappings = require('./mappings');
 const labels = require('./labels');
 
 // ---------------------------------------------------------------------------
+//  Main-process console output is invisible in the packaged exe, so a crash
+//  here would otherwise look like "the app just doesn't start". Surface it in
+//  a native dialog instead (showErrorBox is safe even before app.whenReady).
+// ---------------------------------------------------------------------------
+process.on('uncaughtException', (err) => {
+  dialog.showErrorBox(
+    'Certiorari — unexpected error',
+    `${err?.stack || err}\n\nThe app may be in a bad state; consider restarting it.`
+  );
+});
+process.on('unhandledRejection', (reason) => {
+  dialog.showErrorBox(
+    'Certiorari — unexpected error',
+    `Unhandled promise rejection:\n${reason?.stack || reason}`
+  );
+});
+
+// ---------------------------------------------------------------------------
 //  host -> chosen certificate identity, consulted during the TLS handshake.
 //  Set by the renderer (via IPC) BEFORE we load a URL for that host.
 //  Shape: { thumbprint, serialNumber, label }
