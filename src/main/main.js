@@ -34,6 +34,11 @@ process.on('unhandledRejection', (reason) => {
 // ---------------------------------------------------------------------------
 const certForHost = new Map();
 
+// embedder webContents.id -> partition of its live <webview>. Registered by
+// each app window on every mount, so a popup opened from that window can be
+// mounted on the SAME partition (shared TLS session + cookies + chosen cert).
+const partitionByEmbedder = new Map();
+
 let mainWindow = null;
 let logWindow = null;
 
@@ -66,6 +71,47 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 }
 
+// A popup gets the SAME chrome as the main window (toolbar, cert button,
+// status bar): it's index.html in "popup mode", told which URL to open and
+// which partition to mount so it stays in the opener's TLS session.
+function openPopupWindow(url, partition) {
+  const win = new BrowserWindow({
+    width: 1100,
+    height: 800,
+    backgroundColor: '#1e1f23',
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      webviewTag: true,
+    },
+  });
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'), {
+    query: { popup: '1', url, partition: partition || '' },
+  });
+  return win;
+}
+
+// ---------------------------------------------------------------------------
+//  Links a site targets at a new window (window.open / target="_blank").
+//  Without this, `allowpopups` spawns a BARE Chromium window — no toolbar, no
+//  cert selector, no status bar. Instead we deny the native popup and open a
+//  full app window on the opener's partition. Applies to every <webview> we
+//  ever create, popups' webviews included (so nested popups work too).
+// ---------------------------------------------------------------------------
+app.on('web-contents-created', (_evt, contents) => {
+  if (contents.getType() !== 'webview') return;
+  contents.setWindowOpenHandler(({ url }) => {
+    if (!/^https?:/i.test(url)) return { action: 'deny' };
+    const embedderId = contents.hostWebContents ? contents.hostWebContents.id : null;
+    const partition = partitionByEmbedder.get(embedderId) || '';
+    logToWindow('popup', `opening popup window url=${url} partition=${partition || '(fresh)'}`);
+    openPopupWindow(url, partition);
+    return { action: 'deny' };
+  });
+});
+
 // ---------------------------------------------------------------------------
 //  THE CORE HOOK.
 //  Fires when a server requests a client certificate. We suppress Chromium's
@@ -88,16 +134,20 @@ app.on('select-client-certificate', (event, webContents, url, list, callback) =>
       event.preventDefault();
       callback(match);
       matched = true;
-      notifyRenderer('cert:applied', { host, label: want.label, ok: true });
+      notifyRenderer('cert:applied', { host, label: want.label, ok: true }, webContents);
     } else {
       // The chosen cert was NOT among those the server is willing to accept
       // (its CertificateRequest named different CAs). Let the native picker show.
-      notifyRenderer('cert:applied', {
-        host,
-        label: want.label,
-        ok: false,
-        reason: 'The selected certificate was not offered/accepted by this server.',
-      });
+      notifyRenderer(
+        'cert:applied',
+        {
+          host,
+          label: want.label,
+          ok: false,
+          reason: 'The selected certificate was not offered/accepted by this server.',
+        },
+        webContents
+      );
     }
   }
   // (No recorded choice, or no match → no preventDefault → Chromium's native picker.)
@@ -121,13 +171,22 @@ app.on('select-client-certificate', (event, webContents, url, list, callback) =>
     at: new Date().toLocaleTimeString(),
   };
   logToWindow('diag', '[client-cert] EVENT FIRING', diag);
-  notifyRenderer('cert:diag', diag);
+  notifyRenderer('cert:diag', diag, webContents);
 });
 
-function notifyRenderer(channel, payload) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(channel, payload);
-  }
+// Deliver to the window that owns `sourceWc` (the <webview> doing the
+// handshake — its hostWebContents is the app window embedding it, which may be
+// a popup). Without a source, or if it's gone, fall back to the main window.
+// The log window always gets a copy.
+function notifyRenderer(channel, payload, sourceWc) {
+  const embedder = sourceWc && sourceWc.hostWebContents;
+  const target =
+    embedder && !embedder.isDestroyed()
+      ? embedder
+      : mainWindow && !mainWindow.isDestroyed()
+        ? mainWindow.webContents
+        : null;
+  if (target) target.send(channel, payload);
   if (logWindow && !logWindow.isDestroyed()) {
     logWindow.webContents.send(channel, payload);
   }
@@ -189,6 +248,21 @@ ipcMain.handle('session:setCert', (_evt, { url, identity }) => {
   if (!host) return { ok: false, error: 'Invalid URL' };
   certForHost.set(host, identity); // { thumbprint, serialNumber, label }
   return { ok: true, host };
+});
+
+// Popup windows use this at boot to show which cert their host inherited.
+ipcMain.handle('session:getCert', (_evt, url) => certForHost.get(hostFromUrl(url)) || null);
+
+// Each app window reports its live webview partition, so a popup opened from
+// that window can be mounted on the same one (see web-contents-created above).
+ipcMain.handle('session:registerPartition', (evt, partition) => {
+  const wc = evt.sender;
+  const id = wc.id; // capture: wc.id is unreadable once destroyed
+  if (!partitionByEmbedder.has(id)) {
+    wc.once('destroyed', () => partitionByEmbedder.delete(id));
+  }
+  partitionByEmbedder.set(id, partition);
+  return true;
 });
 
 ipcMain.handle('config:getLastUrl', () => config.getLastUrl());

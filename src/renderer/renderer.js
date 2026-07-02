@@ -11,6 +11,13 @@ let currentPartition = null; // partition of the live webview (nuked on cert cha
 let pickerResolve = null; // set while the picker modal is open
 let unlockTarget = null; // cert being edited in the unlock modal
 
+// Popup mode: main opened this window for a link the site targeted at a new
+// window (window.open / target="_blank"). The query string carries the URL to
+// open and the opener's partition, so we join its TLS session (same cert,
+// same cookies) instead of minting a fresh one.
+const BOOT_PARAMS = new URLSearchParams(location.search);
+const IS_POPUP = BOOT_PARAMS.get('popup') === '1';
+
 // ---- element helpers ------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 const show = (el) => el.classList.remove('hidden');
@@ -36,10 +43,26 @@ function normalizeUrl(input) {
 //  START VIEW
 // ===========================================================================
 (async function initStart() {
+  if (IS_POPUP) return initPopup();
   const last = await api.getLastUrl();
   $('url-input').value = last || ''; // autopopulate last URL, default empty
   $('url-input').focus();
 })();
+
+// Skip the start screen and go straight to browsing the popup's URL, on the
+// opener's partition. The cert button shows whatever cert is mapped for this
+// host (inherited from the opener) and works exactly like in the main window.
+async function initPopup() {
+  const url = BOOT_PARAMS.get('url') || '';
+  currentUrl = url;
+  const identity = await api.getCertForUrl(url);
+  if (identity) {
+    currentCert = identity;
+    $('cert-btn-label').textContent = identity.label;
+  }
+  switchView('browser');
+  mountWebview(url, BOOT_PARAMS.get('partition') || null);
+}
 
 $('url-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -242,13 +265,17 @@ async function applyCertAndBrowse(cert, url, freshSession) {
 
 // Recreate the <webview> with a brand-new in-memory partition. This is what
 // forces Chromium to renegotiate TLS (and thus re-fire select-client-certificate)
-// so a newly chosen cert actually takes effect.
-function mountWebview(url) {
+// so a newly chosen cert actually takes effect. Popup windows pass the
+// opener's partition instead, to stay in its TLS session.
+function mountWebview(url, existingPartition) {
   const container = $('browser-container');
   container.innerHTML = '';
 
-  const partition = `clientcert-${Date.now()}-${++partitionSeq}`; // unique, in-memory (no 'persist:')
+  const partition =
+    existingPartition || `clientcert-${Date.now()}-${++partitionSeq}`; // unique, in-memory (no 'persist:')
   currentPartition = partition;
+  // Let main know, so popups opened from this window join this partition.
+  api.registerPartition(partition);
   const wv = document.createElement('webview');
   wv.setAttribute('partition', partition);
   wv.setAttribute('allowpopups', 'true');

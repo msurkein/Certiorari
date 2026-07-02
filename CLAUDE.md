@@ -62,6 +62,18 @@ the Electron runtime and is exercised manually, not unit-tested.
 **Changing the cert** (the 🔐 button) updates the map, runs a "nuclear" reset, then mounts
 a **new** partition so the handshake re-fires. See the next section — this is the subtle part.
 
+**Popup windows** (`window.open` / `target="_blank"` inside the `<webview>`): main
+intercepts them (`web-contents-created` → `setWindowOpenHandler` on every webview guest,
+http(s) only) and opens a full app window instead of a bare Chromium one —
+`index.html?popup=1&url=…&partition=…`, so the toolbar/cert button/status bar all exist
+there too. The popup's webview mounts on the **opener's partition** (each window reports
+its live partition via `session:registerPartition`), so it shares the opener's TLS
+session, cookies, and cert; its cert button label is seeded via `session:getCert`.
+`cert:applied`/`cert:diag` are delivered to the window that owns the handshaking webview
+(`hostWebContents`), not always the main window. Note: changing the cert in a popup nukes
+the shared old partition (opener included) and `certForHost` is global per host — windows
+are not cert-independent.
+
 ## Known-tricky area: client-cert "stickiness" (ACTIVE)
 
 Chromium caches the client-cert choice in `SSLClientAuthCache`, which is **per network
