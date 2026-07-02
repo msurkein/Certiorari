@@ -1,13 +1,31 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, session, dialog, Menu } = require('electron');
 
 const certs = require('./certs');
 const config = require('./config');
 const secrets = require('./secrets');
 const mappings = require('./mappings');
 const labels = require('./labels');
+
+// ---------------------------------------------------------------------------
+//  Main-process console output is invisible in the packaged exe, so a crash
+//  here would otherwise look like "the app just doesn't start". Surface it in
+//  a native dialog instead (showErrorBox is safe even before app.whenReady).
+// ---------------------------------------------------------------------------
+process.on('uncaughtException', (err) => {
+  dialog.showErrorBox(
+    'Certiorari — unexpected error',
+    `${err?.stack || err}\n\nThe app may be in a bad state; consider restarting it.`
+  );
+});
+process.on('unhandledRejection', (reason) => {
+  dialog.showErrorBox(
+    'Certiorari — unexpected error',
+    `Unhandled promise rejection:\n${reason?.stack || reason}`
+  );
+});
 
 // ---------------------------------------------------------------------------
 //  host -> chosen certificate identity, consulted during the TLS handshake.
