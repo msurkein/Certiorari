@@ -1,6 +1,6 @@
 {
   "name": "certiorari",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Pick a specific Windows client certificate and browse a site with it (mTLS).",
   "main": "src/main/main.js",
