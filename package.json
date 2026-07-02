@@ -6,6 +6,7 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test",
     "certs": "node scripts/list-certs.js",
     "pack": "electron-builder --dir",
     "dist": "npm run version:patch && electron-builder --win",

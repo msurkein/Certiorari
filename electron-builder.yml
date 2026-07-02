@@ -41,6 +41,10 @@ win:
 
 portable:
   artifactName: ${productName}-${version}-portable.exe
+  # Extract to a stable, named folder under %TEMP% instead of a random one.
+  # A recognizable path is less AV/AppLocker-hostile, and re-launches reuse the
+  # already-extracted payload instead of unpacking 90 MB every start.
+  unpackDirName: certiorari-portable
 
 nsis:
   oneClick: true          # simple, no wizard

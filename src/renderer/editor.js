@@ -272,7 +272,6 @@ function wireEvents() {
   }, 250);
   $('test-subject').addEventListener('input', onTestEdit);
   $('test-issuer').addEventListener('input', onTestEdit);
-  
   // export/import
   $('export-btn').addEventListener('click', async () => {
     const str = await api.mappings.export();
