@@ -126,8 +126,9 @@ test/*.test.js         node:test unit tests (Electron-free helpers)
 build/                 icon.svg + icon instructions
 ```
 
-The mappings editor also has **Export / Import** (whole-store JSON, merge-by-scope on
-import) via `dialog` in main → `mappings:export` / `mappings:import` IPC.
+The mappings editor also has **Export / Import** (whole-store JSON as a string: export
+copies to the clipboard, import is a paste-in modal with a "replace all" option,
+duplicate rules skipped on merge) via `mappings:export` / `mappings:import` IPC.
 
 ## Conventions & invariants
 

@@ -31,7 +31,7 @@ function listCertificates() {
 $ErrorActionPreference = 'Stop'
 $paths = @(${STORE_PATHS.map((p) => `'${p}'`).join(',')})
 $all = foreach ($p in $paths) {
-  Get-ChildItem $p | Where-Object { $_.HasPrivateKey } | ForEach-Object {
+  Get-ChildItem $p | Where-Object { $_.HasPrivateKey -and $_.Subject -ne $_.Issuer } | ForEach-Object {
     $eku = @()
     try { $eku = @($_.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId }) } catch {}
     [PSCustomObject]@{
@@ -176,17 +176,35 @@ function parseDN(dn) {
 function findCertInList(list, want) {
   if (!Array.isArray(list)) return null;
 
+  const log = (msg) => {
+    console.log(msg);
+    // Note: We don't have a direct handle to notifyRenderer here, 
+    // but the main.js calls that use this will be logged.
+  };
+
+  log(`[findCertInList] Searching for "${want.label}" (Thumbprint: ${want.thumbprint}, Serial: ${want.serialNumber})`);
+  log(`[findCertInList] Server offered ${list.length} certificates:`);
+
   if (want.thumbprint) {
-    for (const c of list) {
+    for (const [i, c] of list.entries()) {
       const tp = sha1ThumbprintFromPem(c && c.data);
-      if (tp && tp === want.thumbprint) return c;
+      const sn = normalizeSerial(c && c.serialNumber);
+      log(`  [${i}] Subject: ${c.subjectName}, Thumbprint: ${tp}, Serial: ${sn}`);
+      if (tp && tp === want.thumbprint) {
+        log(`  => Match found by thumbprint at index ${i}`);
+        return c;
+      }
     }
   }
   if (want.serialNumber) {
-    for (const c of list) {
-      if (normalizeSerial(c && c.serialNumber) === want.serialNumber) return c;
+    for (const [i, c] of list.entries()) {
+      if (normalizeSerial(c && c.serialNumber) === want.serialNumber) {
+        log(`  => Match found by serial number at index ${i}`);
+        return c;
+      }
     }
   }
+  log('  => No match found in the offered list.');
   return null;
 }
 

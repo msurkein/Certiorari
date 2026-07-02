@@ -1,8 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const fs = require('node:fs');
-const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, session, dialog, Menu } = require('electron');
 
 const certs = require('./certs');
 const config = require('./config');
@@ -36,10 +35,15 @@ process.on('unhandledRejection', (reason) => {
 const certForHost = new Map();
 
 let mainWindow = null;
+let logWindow = null;
 
 function hostFromUrl(url) {
   try {
-    return new URL(url).host;
+    let u = url;
+    if (u && !/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) {
+      u = 'https://' + u;
+    }
+    return new URL(u).host;
   } catch {
     return '';
   }
@@ -102,14 +106,21 @@ app.on('select-client-certificate', (event, webContents, url, list, callback) =>
   // visible whether launched via `npm start` or the packaged exe.
   const diag = {
     host,
+    url,
     wcId: webContents.id,
     defaultSession: onDefaultSession,
+    partition: webContents.session.getStoragePath() || 'in-memory',
     offered: list.length,
+    offeredDetails: list.map(c => ({
+      subject: c.subjectName,
+      tp: certs.sha1ThumbprintFromPem(c.data),
+      sn: certs.normalizeSerial(c.serialNumber)
+    })),
     want: want ? want.label : null,
     matched,
     at: new Date().toLocaleTimeString(),
   };
-  console.log('[client-cert]', JSON.stringify(diag));
+  logToWindow('diag', '[client-cert] EVENT FIRING', diag);
   notifyRenderer('cert:diag', diag);
 });
 
@@ -117,6 +128,14 @@ function notifyRenderer(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
   }
+  if (logWindow && !logWindow.isDestroyed()) {
+    logWindow.webContents.send(channel, payload);
+  }
+}
+
+function logToWindow(type, message, data = null) {
+  console.log(`[${type}] ${message}`, data ? JSON.stringify(data) : '');
+  notifyRenderer('app:log', { type, message, data });
 }
 
 // ---------------------------------------------------------------------------
@@ -132,9 +151,12 @@ async function nukeSession(ses, name) {
   const steps = [];
   const step = async (label, fn) => {
     try {
+      logToWindow('nuke', `starting ${name}:${label}`);
       await fn();
       steps.push(label);
-    } catch {
+      logToWindow('nuke', `finished ${name}:${label}`);
+    } catch (e) {
+      logToWindow('nuke', `failed ${name}:${label} - ${e.message}`);
       steps.push(label + '✗');
     }
   };
@@ -190,7 +212,7 @@ ipcMain.handle('session:nuke', async (_evt, partitionName) => {
   if (partitionName) {
     results.push(await nukeSession(session.fromPartition(partitionName), partitionName));
   }
-  console.log('[nuke]', JSON.stringify(results));
+  logToWindow('nuke', 'Nuclear reset complete', results);
   return results;
 });
 
@@ -205,35 +227,15 @@ ipcMain.handle('mappings:setBucket', (_evt, { key, rules }) => {
   return saved;
 });
 ipcMain.handle('mappings:globalKey', () => mappings.GLOBAL_KEY);
-ipcMain.handle('mappings:preview', (_evt, payload) => labels.preview(payload));
-
-ipcMain.handle('mappings:export', async () => {
-  const res = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow(), {
-    title: 'Export label mappings',
-    defaultPath: 'certiorari-mappings.json',
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-  });
-  if (res.canceled || !res.filePath) return { canceled: true };
-  fs.writeFileSync(res.filePath, JSON.stringify(mappings.exportStore(), null, 2), 'utf8');
-  return { ok: true, path: res.filePath };
-});
-
-ipcMain.handle('mappings:import', async () => {
-  const res = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
-    title: 'Import label mappings',
-    properties: ['openFile'],
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-  });
-  if (res.canceled || !res.filePaths || !res.filePaths.length) return { canceled: true };
-  try {
-    const obj = JSON.parse(fs.readFileSync(res.filePaths[0], 'utf8'));
-    const result = mappings.importStore(obj);
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('mappings:changed');
-    return { ok: true, ...result };
-  } catch (e) {
-    return { error: String((e && e.message) || e) };
+ipcMain.handle('mappings:export', () => mappings.exportToString());
+ipcMain.handle('mappings:import', (_evt, { str, replace }) => {
+  const ok = mappings.importFromString(str, replace);
+  if (ok && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('mappings:changed');
   }
+  return ok;
 });
+ipcMain.handle('mappings:preview', (_evt, payload) => labels.preview(payload));
 
 // Open the mappings editor in its own window, scoped to the given url's origin.
 let editorWindow = null;
@@ -264,7 +266,83 @@ ipcMain.handle('mappings:openEditor', (_evt, url) => {
   });
 });
 
+function openLogWindow() {
+  if (logWindow && !logWindow.isDestroyed()) {
+    logWindow.focus();
+    return;
+  }
+  logWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    backgroundColor: '#0d0e12',
+    title: 'Diagnostic Logs',
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  logWindow.setMenuBarVisibility(false);
+  logWindow.loadFile(path.join(__dirname, '..', 'renderer', 'logs.html'));
+  logWindow.on('closed', () => {
+    logWindow = null;
+  });
+}
+
+function setupMenu() {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Diagnostic',
+      submenu: [
+        {
+          label: 'Show Logs',
+          click: () => openLogWindow()
+        }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { role: 'close' }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 app.whenReady().then(() => {
+  logToWindow('info', 'App starting...');
+  logToWindow('info', `  userData: ${app.getPath('userData')}`);
+  logToWindow('info', `  cache:    ${app.getPath('cache')}`);
+  logToWindow('info', `  temp:     ${app.getPath('temp')}`);
+  logToWindow('info', `  name:     ${app.name}`);
+
+  setupMenu();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

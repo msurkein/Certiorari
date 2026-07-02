@@ -272,31 +272,47 @@ function wireEvents() {
   }, 250);
   $('test-subject').addEventListener('input', onTestEdit);
   $('test-issuer').addEventListener('input', onTestEdit);
-
+  // export/import
   $('export-btn').addEventListener('click', async () => {
-    const r = await api.mappings.export();
-    if (r.canceled) return;
-    setIoStatus(r.ok ? `Exported to ${r.path}` : 'Export failed');
+    const str = await api.mappings.export();
+    await navigator.clipboard.writeText(str);
+    const oldText = $('export-btn').textContent;
+    $('export-btn').textContent = 'Copied!';
+    setTimeout(() => { $('export-btn').textContent = oldText; }, 2000);
   });
 
-  $('import-btn').addEventListener('click', async () => {
-    const r = await api.mappings.import();
-    if (r.canceled) return;
-    if (r.error) {
-      setIoStatus(`Import failed: ${r.error}`);
-      return;
+  const modal = $('import-modal');
+  $('import-btn').addEventListener('click', () => {
+    $('import-text').value = '';
+    modal.classList.remove('hidden');
+    $('import-text').focus();
+  });
+  
+  const closeImport = () => modal.classList.add('hidden');
+  $('import-close').addEventListener('click', closeImport);
+  $('import-cancel').addEventListener('click', closeImport);
+
+  $('import-confirm').addEventListener('click', async () => {
+    const str = $('import-text').value.trim();
+    if (!str) return;
+    const replace = $('import-replace').checked;
+    
+    try {
+      const ok = await api.mappings.import(str, replace);
+      if (ok) {
+        closeImport();
+        // Reload everything
+        buckets = await api.mappings.getAll();
+        populateBuckets();
+        loadBucket(selectedKey);
+        const d = $('dirty');
+        d.textContent = 'Imported ✓';
+        setTimeout(() => { if (!dirty) d.textContent = ''; }, 2000);
+      }
+    } catch (err) {
+      alert(`Import failed: ${err.message}`);
     }
-    // Reload from the now-updated store, keeping the current scope if it survives.
-    buckets = await api.mappings.getAll();
-    if (!buckets[selectedKey] && selectedKey !== GLOBAL) selectedKey = GLOBAL;
-    populateBuckets();
-    loadBucket(selectedKey);
-    setIoStatus(`Imported ${r.buckets} scope${r.buckets === 1 ? '' : 's'}`);
   });
-}
-
-function setIoStatus(text) {
-  $('io-status').textContent = text;
 }
 
 async function save() {

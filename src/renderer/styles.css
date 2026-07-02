@@ -249,7 +249,7 @@ button:focus-visible { outline: none; box-shadow: var(--ring); }
   animation: fade-in 0.18s ease;
 }
 .modal {
-  width: 580px; max-width: 92vw; max-height: 84vh;
+  width: 580px; max-width: 90vw; max-height: 90vh;
   display: flex; flex-direction: column;
   background: linear-gradient(180deg, var(--elevated), var(--surface));
   border: 1px solid var(--border-strong);
@@ -258,13 +258,11 @@ button:focus-visible { outline: none; box-shadow: var(--ring); }
   padding: 18px;
   animation: pop-in 0.2s ease;
 }
-.modal.small { width: 430px; }
-/* The cert picker grows with its content: wider for long labels, up to most of
-   the app (94vw), while staying compact when labels are short. */
+.modal.small { width: 430px; height: auto; }
+/* The cert picker grows with its content. */
 #picker-modal .modal {
-  width: fit-content;
-  min-width: min(720px, 94vw);
-  max-width: 94vw;
+  width: 90vw;
+  height: 90vh;
 }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .modal-head h2 { margin: 0; font-size: 17px; font-weight: 620; }

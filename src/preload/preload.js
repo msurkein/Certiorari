@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('certiorari', {
     preview: (payload) => ipcRenderer.invoke('mappings:preview', payload),
     openEditor: (url) => ipcRenderer.invoke('mappings:openEditor', url),
     export: () => ipcRenderer.invoke('mappings:export'),
-    import: () => ipcRenderer.invoke('mappings:import'),
+    import: (str, replace) => ipcRenderer.invoke('mappings:import', { str, replace }),
   },
   onMappingsChanged: (cb) => {
     const handler = () => cb();
@@ -52,5 +52,10 @@ contextBridge.exposeInMainWorld('certiorari', {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on('cert:diag', handler);
     return () => ipcRenderer.removeListener('cert:diag', handler);
+  },
+  onLog: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('app:log', handler);
+    return () => ipcRenderer.removeListener('app:log', handler);
   },
 });

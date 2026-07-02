@@ -247,7 +247,7 @@ function mountWebview(url) {
   const container = $('browser-container');
   container.innerHTML = '';
 
-  const partition = `clientcert-${++partitionSeq}`; // unique, in-memory (no 'persist:')
+  const partition = `clientcert-${Date.now()}-${++partitionSeq}`; // unique, in-memory (no 'persist:')
   currentPartition = partition;
   const wv = document.createElement('webview');
   wv.setAttribute('partition', partition);
